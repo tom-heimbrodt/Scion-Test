@@ -6,10 +6,12 @@ import android.content.res.AssetManager;
 import android.os.Bundle;
 import android.util.Log;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.URI;
 import java.nio.file.FileSystem;
@@ -32,39 +34,56 @@ public class MainActivity extends AppCompatActivity {
     }
 
     void runExecutable() {
-        //String appFileDirectory = getFilesDir().getPath();
-        String filename = "scion-android-linux_arm_pure_stripped";
+        String execFilename = "scion-android-linux_amd32_stripped";
+        String dispFilename = "disp.toml";
         String appFileDirectory = "/data/data/com.example.myapplication";
-        String executableFilePath = appFileDirectory + "/" + filename;
 
-        copyAssets(filename);
+        String execPath = appFileDirectory + "/" + execFilename;
+        String dispPath = appFileDirectory + "/" + dispFilename;
 
-        File execFile = new File(executableFilePath);
-        execFile.setExecutable(true);
+        copyAssets(execFilename, execPath);
+        copyAssets(dispFilename, dispPath);
+
+        File execFile = new File(execPath);
+        boolean success = execFile.setExecutable(true);
+        Log.d("RUN EXE", "Set executable flag says: " + success);
 
         try {
-            Process process = Runtime.getRuntime().exec(executableFilePath);
+            ProcessBuilder builder = new ProcessBuilder(
+                    execPath,
+                    "godispatcher",
+                    "-lib_env_config",
+                    dispPath);
+            builder.redirectErrorStream(true);
+            Process process = builder.start();
+
+            Log.d("RUN EXE", "Successfully started exe.");
+
+            BufferedReader input = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            String line;
+            while ((line = input.readLine()) != null) {
+                Log.e("EXEC SAYS", line);
+            }
+            input.close();
         } catch (IOException e) {
-            Log.e("run exe", "Exception: " + e.toString());
+            Log.e("RUN EXE", "Exception: " + e.toString());
         }
     }
 
-    private void copyAssets(String filename) {
+    private void copyAssets(String filename, String destinationPath) {
 
         AssetManager assetManager = getAssets();
 
-        Log.d("copy assets", "Attempting to copy this file: " + filename); // + " to: " +       assetCopyDestination);
+        Log.d("ASSETS COPY", "Attempting to copy this file: " + filename + " to: " + destinationPath);
 
-        String appFileDirectory = "/data/data/com.example.myapplication";
         try {
             InputStream in = assetManager.open(filename);
-            Path outputPath = Paths.get(appFileDirectory, filename);
+            Path outputPath = Paths.get(destinationPath);
             Files.copy(in, outputPath);
             in.close();
+            Log.d("ASSETS COPY", "Copy success: " + filename);
         } catch(IOException e) {
-            Log.e("copy assets", "Failed to copy asset file: " + filename, e);
+            Log.w("ASSETS COPY", "Failed to copy asset file: " + e.toString());
         }
-
-        Log.d("copy assets", "Copy success: " + filename);
     }
 }
